@@ -1,0 +1,15 @@
+# EXTRACT ACTIVATIONS FROM MODEL
+python extract-activations.py --overwrite
+
+# EVAL FULL MODEL
+python eval_model_on_agreement_per_verb.py
+
+# PCA SENTENCES
+python pca_sentences.py
+
+# INJECT NOISE AT VARIOUS TIME POINTS IN PCA DIRECTION AND EVAL MODEL
+./inject_activity_and_eval.sh
+
+# PLOT RESULTS
+python plot_injection_results.py
+
