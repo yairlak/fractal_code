@@ -20,8 +20,8 @@ parser.add_argument('--unit', default=0, type=int)
 parser.add_argument('--unit-to-plot', default=23, type=int)
 parser.add_argument('--relative-pert', action='store_true', default=True)
 parser.add_argument('--pc', type=int, default=2, help='If args.unit=0 (pertubation in pc direction), then this arg determines which PC to take (counting from 1!).')
-parser.add_argument('--currents', type=float, default=[-10, -5, -3, -2, 0])
-parser.add_argument('--t-for-activation-plot', default=[4, 5, 6, 7, 11, 12], type=int)
+parser.add_argument('--currents', type=float, default=[-10, -5, 0, 5, 10])
+parser.add_argument('--t-for-activation-plot', default=[6,9], type=int)
 args = parser.parse_args()
 
 # Generate conditions
@@ -184,14 +184,9 @@ if args.unit == 0:  # PCA case
     LSTM_activations_no_perturb = LSTM_activations_no_perturb['hidden']
 
     print('Prepare data for PCA: breaking down sentences into words')
-    # design_matrix_all_words = np.vstack([np.reshape(trial_data, (1, -1), order='C') for trial_data in tqdm(LSTM_activations_no_perturb)])
     design_matrix_all_words = np.vstack(
         [np.reshape(word_data, (1, -1), order='C') for sentence_data in tqdm(LSTM_activations_no_perturb) for word_data in
          sentence_data])
-
-    print('Prepare data for PCA: standardize data')
-    # standardized_scale = preprocessing.StandardScaler().fit(design_matrix_all_words)
-    # words_standardized = standardized_scale.transform(design_matrix_all_words)
 
     print('Run PCA')
     pca = decomposition.PCA(n_components=2)
@@ -204,9 +199,11 @@ num_subplots = len(args.currents)
 num_timepoint_to_plot = len(args.t_for_activation_plot)
 num_words = len(sentences[0].split(' '))
 
-fig_im, axs = plt.subplots(num_subplots, num_timepoint_to_plot+1, figsize=(10 + num_timepoint_to_plot*5, 4 * num_subplots))
+# perf = np.zeros((3, args.depth, num_words)) # 3 for sing/plur/both
+performance_ablated_model = np.empty((3, args.depth, num_words))
+
+fig_im, axs = plt.subplots(num_subplots, num_timepoint_to_plot+3, figsize=(10 + num_timepoint_to_plot*5, 4 * num_subplots))
 for i_ax, current in enumerate(args.currents):
-    perf = np.zeros((3, num_words))
     for inject_time in range(num_words):
         filename = '%s_%s_injected_to_%s_unit_%i_current_%1.2f_inject_time_%s' % (os.path.basename(args.model), os.path.basename(args.sentences), 'hidden', args.unit, current, inject_time)
         if args.unit == 0: # PC case
@@ -224,29 +221,17 @@ for i_ax, current in enumerate(args.currents):
         # order of verbs in ablation is from inner to outer, whereas v_1 is considered as the outmost verb!
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!11
         performance = np.flip(performance, axis=1)
-        performance_ablated_model = np.empty((3, args.depth))
-        performance_ablated_model[:] = np.nan
+
         for v in range(args.depth):  # V_1 refers to the outmost verb
-            performance_all_curr_verb = np.average(performance[:, v], axis=0)
-            performance_singular_curr_verb = np.average(performance[IX2sentences[v + 1]['singular'], v], axis=0)
-            performance_plural_curr_verb = np.average(performance[IX2sentences[v + 1]['plural'], v], axis=0)
-            performance_ablated_model[0, v] = performance_all_curr_verb
-            performance_ablated_model[1, v] = performance_singular_curr_verb
-            performance_ablated_model[2, v] = performance_plural_curr_verb
+            performance_ablated_model[0, v, inject_time] = np.average(performance[:, v], axis=0) # Both
+            performance_ablated_model[1, v, inject_time] = np.average(performance[IX2sentences[v + 1]['singular'], v], axis=0) # singular
+            performance_ablated_model[2, v, inject_time] = np.average(performance[IX2sentences[v + 1]['plural'], v], axis=0) # plural
 
 
-        ###################
-        # Collect results #
-        ###################
+        ####################
+        # PLOT ACTIVATIONS #
+        ####################
 
-        for v in range(args.depth): # num_verbs = depth
-            for i, s in enumerate(['Any', 'Singular', 'Plural']):
-                performance_full_model_curr_verb = performance_full_model[i, v]
-                performance_injected_model_curr_verb = performance_ablated_model[i, v]
-                if s in ['Any']:
-                    perf[v, inject_time] = performance_injected_model_curr_verb
-
-        # PLOT ACTIVATIONS
         if inject_time in args.t_for_activation_plot:
             IX_t = args.t_for_activation_plot.index(inject_time)
             with open(filename + '.pkl', 'rb') as f:
@@ -254,13 +239,7 @@ for i_ax, current in enumerate(args.currents):
 
             if args.unit == 0: # PCA case. Project activations with pca projection of non-perturbed network
                 print('Prepare data for PCA: breaking down sentences into words')
-                # design_matrix_all_words = np.vstack([np.reshape(trial_data, (1,-1), order='C') for trial_data in tqdm(LSTM_activation)])
                 design_matrix_all_words = np.vstack([np.reshape(word_data, (1, -1), order='C') for sentence_data in tqdm(LSTM_activations) for word_data in sentence_data])
-
-                # print('standardize data')
-                # standardized_scale = preprocessing.StandardScaler().fit(design_matrix_all_words)
-                # words_standardized = standardized_scale.transform(design_matrix_all_words)
-
                 words_PCA_projected = pca.transform(design_matrix_all_words)
 
                 PCA_trajectories = []
@@ -283,18 +262,19 @@ for i_ax, current in enumerate(args.currents):
                 curr_stimuli = [sentence for ind, sentence in enumerate(sentences) if ind in IX_to_sentences]
                 add_graph_to_plot(axs[i_ax, IX_t], graph_activations, unit, gate, label, color, ls, lw)
 
-
-    im = axs[i_ax, -1].imshow(perf, origin='lower', vmin=0, vmax=1, cmap='RdBu_r')
-    if i_ax == num_subplots-1:
-        axs[i_ax, -1].set_xlabel('Pertubation time', fontsize=16)
-    # axs[i_ax, -1].set_ylabel('Verb', fontsize=16)
     words = sentences[0].split(' ')
     words = [w[0] for w in words]
-    axs[i_ax, -1].set_xticks(range(len(words)))
-    axs[i_ax, -1].set_xticklabels(words)
-    axs[i_ax, -1].set_yticks(range(3))
-    axs[i_ax, -1].set_yticklabels(['V1', 'V2', 'V3'])
-    axs[i_ax, -1].set_title('Injection value = %1.2f' % current)
+    for i_spb, spb in enumerate(['Both', 'Singular', 'Plural']):
+        im = axs[i_ax, -3+i_spb].imshow(performance_ablated_model[i_spb, :, :], origin='lower', vmin=0, vmax=1, cmap='RdBu_r')
+
+        if i_ax == num_subplots-1:
+            axs[i_ax, -3+i_spb].set_xlabel(spb, fontsize=16)
+        # axs[i_ax, -1].set_ylabel('Verb', fontsize=16)
+        axs[i_ax, -3+i_spb].set_xticks(range(len(words)))
+        axs[i_ax, -3+i_spb].set_xticklabels(words)
+        axs[i_ax, -3+i_spb].set_yticks(range(3))
+        axs[i_ax, -3+i_spb].set_yticklabels(['V1', 'V2', 'V3'])
+        axs[i_ax, -3+i_spb].set_title('Injection value = %1.2f' % current)
 
     for j, t_inject in enumerate(args.t_for_activation_plot):
         axs[i_ax, j].set_xticks(range(1, len(words)+1))

@@ -54,3 +54,8 @@ def get_wrong_prediction(correct_word):
     wrong_word = pos + '[' + list(wrong_feature)[0] + ']'
 
     return wrong_word
+
+
+
+
+
