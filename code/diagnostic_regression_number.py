@@ -77,8 +77,8 @@ X = []
 for i_trial, trial_data in enumerate(LSTM_activations):
     trial_vector_t = []
     for i_t, t_data in enumerate(trial_data):
-        trial_vector_t.append(t_data.reshape(-1, 1)) # flatten multiple layers into a single one
-    X.append(np.hstack(trial_vector_t))
+        trial_vector_t.append(t_data.reshape(-1)) # flatten multiple layers into a single one
+    X.append(np.vstack(trial_vector_t).transpose())
 X = np.asarray(X)
 
 # dict with keys for grammatical number (1,2,..), which in turn contain list (len=#cv-splits) of sublists (len=#timepoints).
@@ -94,6 +94,7 @@ for v in range(args.depth):
     IX_plur = IX2sentences[v + 1]['plural']
     mean_activation[v + 1]['singular'] = np.mean(X[IX_sing, :, :], axis=0)
     mean_activation[v + 1]['plural'] = np.mean(X[IX_plur, :, :], axis=0)
+    mean_activation[v + 1]['difference'] = np.mean(X[IX_sing, :, :], axis=0) - np.mean(X[IX_plur, :, :], axis=0)
     Y = np.zeros(num_trials)
     Y[IX_sing] = 1
     Y[IX_plur] = 2
@@ -130,6 +131,49 @@ for v in range(args.depth):
     print(f'Saved to: ../figures/gat/{fname}')
 
 
+
+
+########################
+# PCA MEAN ACTIVATIONS #
+########################
+for dim in [2, 3]: # 2d and 3d PCA plots
+    pca = PCA(n_components=dim)
+    X = []; num_timepoints = []
+    for v in range(3):
+        X.append(mean_activation[v + 1]['difference'].transpose())
+        num_timepoints.append(mean_activation[v + 1]['difference'].transpose().shape[0])
+    X = np.vstack(X) # lump vectos across grammatical number
+    mean_activation_projected = pca.fit_transform(X)
+    print(f'Explained Variance ({dim}d): {pca.explained_variance_ratio_}')
+    # mean_activation_projected = pca.transform(mean_activation[v + 1]['difference'].transpose())
+
+    # Separate according to grammatical number
+    mean_activation_projected_dict = {}
+    for v in range(args.depth):
+        st = v*num_words
+        ed = (v+1)*num_words
+        mean_activation_projected_dict[v+1] = mean_activation_projected[st:ed,:]
+    # PLOT
+    for v_highlight in range(args.depth):
+        fig_pca, ax_pca = plot_weight_trajectory(mean_activation_projected_dict, mean_activation, diag_scores, words, f'{dim}d', v_highlight)
+        if dim == 2:
+            x_origin, y_origin = pca.transform(np.zeros((1, X.shape[1])))[0]
+            # x_origin, y_origin = 0, 0
+            ax_pca.axhline(y=y_origin, color='k')
+            ax_pca.axvline(x=x_origin, color='k')
+            ax_pca.scatter(x_origin, y_origin)
+
+        elif dim==3:
+            x_origin, y_origin, z_origin = pca.transform(np.zeros((1, X.shape[1])))[0]
+
+        # ax_pca.set_xlim([-1.2, 1])
+        # ax_pca.set_ylim([-0.6, 1])
+        # SAVE
+        fname = f'PCA{dim}D_mean_activations_number_{v_highlight+1}_{args.var_type}.png'
+        fig_pca.savefig(f'../figures/gat/{fname}')
+        print(f'Saved to: ../figures/gat/{fname}')
+
+
 weights_all_numbers = np.vstack([weights_clf[v]['mean'] for v in range(1,4)])
 # weights_std_all_numbers = np.vstack([weights_clf[v + 1]['std'] for v in range(1,4)])
 #############################
@@ -157,6 +201,7 @@ for dim in [2, 3]: # 2d and 3d PCA plots
         fig_pca, ax_pca = plot_weight_trajectory(weights_projected_dict, mean_activation_projected, diag_scores, words, f'{dim}d', v_highlight)
         if dim == 2:
             x_origin, y_origin = pca.transform(np.zeros((1, weights_all_numbers.shape[1])))[0]
+            x_origin, y_origin = 0, 0
             ax_pca.axhline(y=y_origin, color='k')
             ax_pca.axvline(x=x_origin, color='k')
             ax_pca.scatter(x_origin, y_origin)

@@ -102,15 +102,13 @@ def plot_weight_trajectory(weights, mean_activation_projected, diag_scores, word
         COL = MplColorHelper(number_cmaps[v+1], 0, 1)
         st = st_dict[v + 1]
         ed = ed_dict[v + 1]
-        for i_vec, (w, w_next, curr_vec, next_vec, mean_activation_sing, mean_activation_sing_next, mean_activation_plur, mean_activation_plur_next) in enumerate(
-                zip(words[(st - 1):ed], words[st:(ed + 1)], weights[v+1][(st - 1):ed, :],
-                    weights[v+1][st:(ed + 1), :], mean_activation_projected[v+1]['singular'][(st - 1):ed, :],
-                mean_activation_projected[v + 1]['singular'][st:(ed + 1), :],mean_activation_projected[v+1]['plural'][(st - 1):ed, :],
-                mean_activation_projected[v + 1]['plural'][st:(ed + 1), :])):
+        for i_vec, (w, w_next, curr_vec, next_vec) in enumerate(
+                zip(words[(st - 1):ed], words[st:(ed + 1)], weights[v+1][(st - 1):ed, :], weights[v+1][st:(ed + 1), :])):
             color, curr_str = get_color_str(w, st + i_vec)
             c = COL.get_rgb(diag_scores[v+1][st + i_vec])
             alpha = 1
             lw = 1.5
+            headwidth, headlength = 10, 10
             if v_highlight is not None:
                 if v != v_highlight:
                     alpha = 0.05 # reduce alpha of trajectories not under focus
@@ -120,7 +118,7 @@ def plot_weight_trajectory(weights, mean_activation_projected, diag_scores, word
                 x, y = curr_vec
                 x_next, y_next = next_vec
                 ax.quiver(x, y, x_next - x, y_next - y, scale_units='xy', angles='xy', scale=1, units='dots', width=lw,
-                          color=number_colors[v + 1], alpha=alpha)
+                          color=number_colors[v + 1], alpha=alpha, headwidth=headwidth)
                 ax.text(x, y, curr_str, fontsize=16, color=color, alpha=alpha)
                 ax.scatter(x, y, c=c, alpha=alpha)
                 # PLOT ACTIVATIONS

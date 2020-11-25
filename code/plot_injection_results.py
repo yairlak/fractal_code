@@ -20,7 +20,7 @@ parser.add_argument('--unit', default=0, type=int)
 parser.add_argument('--unit-to-plot', default=23, type=int)
 parser.add_argument('--relative-pert', action='store_true', default=True)
 parser.add_argument('--pc', type=int, default=2, help='If args.unit=0 (pertubation in pc direction), then this arg determines which PC to take (counting from 1!).')
-parser.add_argument('--currents', type=float, default=[-10, -5, 0, 5, 10])
+parser.add_argument('--currents', type=float, default=[-10, 0, 10])
 parser.add_argument('--t-for-activation-plot', default=[6,9], type=int)
 args = parser.parse_args()
 
